@@ -94,6 +94,7 @@ pub struct NextConfig {
     pub cross_origin: Option<CrossOriginConfig>,
     pub dev_indicators: Option<DevIndicatorsConfig>,
     pub output: Option<OutputType>,
+    pub turbopack: Option<TurbopackConfig>,
 
     /// Enables the bundling of node_modules packages (externals) for pages
     /// server-side bundles.
@@ -536,7 +537,7 @@ pub enum RemotePatternProtocal {
     OperationValue,
 )]
 #[serde(rename_all = "camelCase")]
-pub struct ExperimentalTurboConfig {
+pub struct TurbopackConfig {
     /// This option has been replaced by `rules`.
     pub loaders: Option<JsonValue>,
     pub rules: Option<FxIndexMap<RcStr, RuleConfigItemOrShortcut>>,
@@ -546,7 +547,6 @@ pub struct ExperimentalTurboConfig {
     pub module_id_strategy: Option<ModuleIdStrategy>,
     pub minify: Option<bool>,
     pub source_maps: Option<bool>,
-    pub unstable_persistent_caching: Option<bool>,
 }
 
 #[derive(
@@ -668,7 +668,6 @@ pub struct ExperimentalConfig {
     mdx_rs: Option<MdxRsOptions>,
     strict_next_head: Option<bool>,
     swc_plugins: Option<Vec<(RcStr, serde_json::Value)>>,
-    turbo: Option<ExperimentalTurboConfig>,
     external_middleware_rewrites_resolve: Option<bool>,
     scroll_restoration: Option<bool>,
     manual_client_base_path: Option<bool>,
@@ -748,6 +747,7 @@ pub struct ExperimentalConfig {
     /// (doesn't apply to Turbopack).
     webpack_build_worker: Option<bool>,
     worker_threads: Option<bool>,
+    turbopack_persistent_caching: Option<bool>,
 }
 
 #[derive(
@@ -1144,12 +1144,7 @@ impl NextConfig {
 
     #[turbo_tasks::function]
     pub fn webpack_rules(&self, active_conditions: Vec<RcStr>) -> Vc<OptionWebpackRules> {
-        let Some(turbo_rules) = self
-            .experimental
-            .turbo
-            .as_ref()
-            .and_then(|t| t.rules.as_ref())
-        else {
+        let Some(turbo_rules) = self.turbopack.as_ref().and_then(|t| t.rules.as_ref()) else {
             return Vc::cell(None);
         };
         if turbo_rules.is_empty() {
@@ -1234,9 +1229,7 @@ impl NextConfig {
     pub fn persistent_caching_enabled(&self) -> Result<Vc<bool>> {
         Ok(Vc::cell(
             self.experimental
-                .turbo
-                .as_ref()
-                .and_then(|t| t.unstable_persistent_caching)
+                .turbopack_persistent_caching
                 .unwrap_or_default(),
         ))
     }
@@ -1244,8 +1237,7 @@ impl NextConfig {
     #[turbo_tasks::function]
     pub fn resolve_alias_options(&self) -> Result<Vc<ResolveAliasMap>> {
         let Some(resolve_alias) = self
-            .experimental
-            .turbo
+            .turbopack
             .as_ref()
             .and_then(|t| t.resolve_alias.as_ref())
         else {
@@ -1258,8 +1250,7 @@ impl NextConfig {
     #[turbo_tasks::function]
     pub fn resolve_extension(&self) -> Vc<ResolveExtensions> {
         let Some(resolve_extensions) = self
-            .experimental
-            .turbo
+            .turbopack
             .as_ref()
             .and_then(|t| t.resolve_extensions.as_ref())
         else {
@@ -1476,11 +1467,7 @@ impl NextConfig {
         &self,
         _is_development: bool,
     ) -> Vc<OptionTreeShaking> {
-        let tree_shaking = self
-            .experimental
-            .turbo
-            .as_ref()
-            .and_then(|v| v.tree_shaking);
+        let tree_shaking = self.turbopack.as_ref().and_then(|v| v.tree_shaking);
 
         OptionTreeShaking(match tree_shaking {
             Some(false) => Some(TreeShakingMode::ReexportsOnly),
@@ -1492,11 +1479,7 @@ impl NextConfig {
 
     #[turbo_tasks::function]
     pub fn tree_shaking_mode_for_user_code(&self, _is_development: bool) -> Vc<OptionTreeShaking> {
-        let tree_shaking = self
-            .experimental
-            .turbo
-            .as_ref()
-            .and_then(|v| v.tree_shaking);
+        let tree_shaking = self.turbopack.as_ref().and_then(|v| v.tree_shaking);
 
         OptionTreeShaking(match tree_shaking {
             Some(false) => Some(TreeShakingMode::ReexportsOnly),
@@ -1508,11 +1491,7 @@ impl NextConfig {
 
     #[turbo_tasks::function]
     pub fn module_id_strategy_config(&self) -> Vc<OptionModuleIdStrategy> {
-        let Some(module_id_strategy) = self
-            .experimental
-            .turbo
-            .as_ref()
-            .and_then(|t| t.module_id_strategy)
+        let Some(module_id_strategy) = self.turbopack.as_ref().and_then(|t| t.module_id_strategy)
         else {
             return Vc::cell(None);
         };
@@ -1521,7 +1500,7 @@ impl NextConfig {
 
     #[turbo_tasks::function]
     pub async fn turbo_minify(&self, mode: Vc<NextMode>) -> Result<Vc<bool>> {
-        let minify = self.experimental.turbo.as_ref().and_then(|t| t.minify);
+        let minify = self.turbopack.as_ref().and_then(|t| t.minify);
 
         Ok(Vc::cell(
             minify.unwrap_or(matches!(*mode.await?, NextMode::Build)),
@@ -1530,7 +1509,7 @@ impl NextConfig {
 
     #[turbo_tasks::function]
     pub async fn turbo_source_maps(&self) -> Result<Vc<bool>> {
-        let source_maps = self.experimental.turbo.as_ref().and_then(|t| t.source_maps);
+        let source_maps = self.turbopack.as_ref().and_then(|t| t.source_maps);
 
         Ok(Vc::cell(source_maps.unwrap_or(true)))
     }
