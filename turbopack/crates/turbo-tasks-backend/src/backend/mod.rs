@@ -455,11 +455,11 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
                     Some(Ok(Err(listen_to_done_event(this, reader, done_event))))
                 }
                 Some(InProgressState::InProgress(box InProgressStateInner {
-                    marked_as_completed,
+                    completed,
                     done_event,
                     ..
                 })) => {
-                    if !*marked_as_completed {
+                    if !*completed {
                         Some(Ok(Err(listen_to_done_event(this, reader, done_event))))
                     } else {
                         None
@@ -604,10 +604,22 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
         };
 
         // Output doesn't exist. We need to schedule the task to compute it.
-        let (item, listener) =
-            CachedDataItem::new_scheduled_with_listener(self.get_task_desc_fn(task_id), note);
-        task.add_new(item);
-        turbo_tasks.schedule(task_id);
+        let listener = if let Some(in_progress) = get_mut!(task, InProgress) {
+            let InProgressState::InProgress(box InProgressStateInner {
+                done_event, stale, ..
+            }) = in_progress
+            else {
+                unreachable!();
+            };
+            *stale = true;
+            done_event.listen_with_note(note)
+        } else {
+            let (item, listener) =
+                CachedDataItem::new_scheduled_with_listener(self.get_task_desc_fn(task_id), note);
+            task.add_new(item);
+            turbo_tasks.schedule(task_id);
+            listener
+        };
 
         Ok(Err(listener))
     }
@@ -1135,6 +1147,7 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
                     done_event,
                     session_dependent: false,
                     marked_as_completed: false,
+                    completed: false,
                     new_children: Default::default(),
                 })),
             });
@@ -1277,7 +1290,7 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
         };
         let &mut InProgressState::InProgress(box InProgressStateInner {
             stale,
-            ref mut marked_as_completed,
+            ref mut completed,
             ref done_event,
             ref mut new_children,
             ..
@@ -1318,10 +1331,8 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
         }
 
         // mark the task as completed, so dependent tasks can continue working
-        if !*marked_as_completed {
-            *marked_as_completed = true;
-            done_event.notify(usize::MAX);
-        }
+        *completed = true;
+        done_event.notify(usize::MAX);
 
         // take the children from the task to process them
         let mut new_children = take(new_children);
@@ -1498,6 +1509,7 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
             once_task: _,
             stale,
             session_dependent,
+            completed: _,
             marked_as_completed: _,
             new_children,
         }) = in_progress
@@ -1882,12 +1894,10 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
         let mut task = ctx.task(task, TaskDataCategory::Data);
         if let Some(InProgressState::InProgress(box InProgressStateInner {
             marked_as_completed,
-            done_event,
             ..
         })) = get_mut!(task, InProgress)
         {
             *marked_as_completed = true;
-            done_event.notify(usize::MAX);
             // TODO this should remove the dirty state (also check session_dependent)
             // but this would break some assumptions for strongly consistent reads.
             // Client tasks are not connected yet, so we wouldn't wait for them.
