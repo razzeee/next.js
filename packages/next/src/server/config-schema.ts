@@ -127,7 +127,7 @@ const zTurboRuleConfigItem: zod.ZodType<TurbopackRuleConfigItem> = z.union([
 const zTurboRuleConfigItemOrShortcut: zod.ZodType<TurbopackRuleConfigItemOrShortcut> =
   z.union([z.array(zTurboLoaderItem), zTurboRuleConfigItem])
 
-const zTurbopackConfig: zod.ZodType<TurbopackOptions> = z.object({
+const zTurbopackConfig: zod.ZodType<TurbopackOptions> = z.strictObject({
   rules: z.record(z.string(), zTurboRuleConfigItemOrShortcut).optional(),
   resolveAlias: z
     .record(
@@ -151,7 +151,7 @@ const zTurbopackConfig: zod.ZodType<TurbopackOptions> = z.object({
 // Same as zTurbopackConfig but with deprecated properties. Unfortunately, base
 // properties are duplicated here as `ZodType`s do not export `extend()`.
 const zDeprecatedExperimentalTurboConfig: zod.ZodType<DeprecatedExperimentalTurboOptions> =
-  z.object({
+  z.strictObject({
     loaders: z.record(z.string(), z.array(zTurboLoaderItem)).optional(),
     rules: z.record(z.string(), zTurboRuleConfigItemOrShortcut).optional(),
     resolveAlias: z
