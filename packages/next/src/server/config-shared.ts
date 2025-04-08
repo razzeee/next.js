@@ -159,7 +159,7 @@ export interface TurbopackOptions {
    * If not set, the default is `'named'` for development and `'deterministic'`
    * for production.
    */
-  moduleIdStrategy?: 'named' | 'deterministic'
+  moduleIds?: 'named' | 'deterministic'
 
   /**
    * This is the repo root usually and only files above this

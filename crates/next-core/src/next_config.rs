@@ -544,7 +544,7 @@ pub struct TurbopackConfig {
     pub resolve_alias: Option<FxIndexMap<RcStr, JsonValue>>,
     pub resolve_extensions: Option<Vec<RcStr>>,
     pub tree_shaking: Option<bool>,
-    pub module_id_strategy: Option<ModuleIdStrategy>,
+    pub module_ids: Option<ModuleIds>,
     pub minify: Option<bool>,
     pub source_maps: Option<bool>,
 }
@@ -590,13 +590,13 @@ pub enum LoaderItem {
 #[turbo_tasks::value(operation)]
 #[derive(Copy, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub enum ModuleIdStrategy {
+pub enum ModuleIds {
     Named,
     Deterministic,
 }
 
 #[turbo_tasks::value(transparent)]
-pub struct OptionModuleIdStrategy(pub Option<ModuleIdStrategy>);
+pub struct OptionModuleIds(pub Option<ModuleIds>);
 
 #[derive(
     Clone, Debug, PartialEq, Serialize, Deserialize, TraceRawVcs, NonLocalValue, OperationValue,
@@ -1490,12 +1490,11 @@ impl NextConfig {
     }
 
     #[turbo_tasks::function]
-    pub fn module_id_strategy_config(&self) -> Vc<OptionModuleIdStrategy> {
-        let Some(module_id_strategy) = self.turbopack.as_ref().and_then(|t| t.module_id_strategy)
-        else {
+    pub fn module_ids(&self) -> Vc<OptionModuleIds> {
+        let Some(module_ids) = self.turbopack.as_ref().and_then(|t| t.module_ids) else {
             return Vc::cell(None);
         };
-        Vc::cell(Some(module_id_strategy))
+        Vc::cell(Some(module_ids))
     }
 
     #[turbo_tasks::function]

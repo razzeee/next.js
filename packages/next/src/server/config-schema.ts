@@ -143,7 +143,7 @@ const zTurbopackConfig: zod.ZodType<TurbopackOptions> = z.object({
   treeShaking: z.boolean().optional(),
   persistentCaching: z.union([z.number(), z.literal(false)]).optional(),
   memoryLimit: z.number().optional(),
-  moduleIdStrategy: z.enum(['named', 'deterministic']).optional(),
+  moduleIds: z.enum(['named', 'deterministic']).optional(),
   minify: z.boolean().optional(),
   sourceMaps: z.boolean().optional(),
 })
@@ -168,7 +168,7 @@ const zDeprecatedExperimentalTurboConfig: zod.ZodType<DeprecatedExperimentalTurb
     treeShaking: z.boolean().optional(),
     persistentCaching: z.union([z.number(), z.literal(false)]).optional(),
     memoryLimit: z.number().optional(),
-    moduleIdStrategy: z.enum(['named', 'deterministic']).optional(),
+    moduleIds: z.enum(['named', 'deterministic']).optional(),
     minify: z.boolean().optional(),
     sourceMaps: z.boolean().optional(),
   })
